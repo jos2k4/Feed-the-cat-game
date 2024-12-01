@@ -1,0 +1,308 @@
+#IMPORT THINGS
+import pygame
+pygame.init()
+from pygame import mixer
+import math
+
+
+#load music
+laser = mixer.Sound('laser_sound.mp3')
+
+step = mixer.Sound('walkig.mp3')
+
+jump = mixer.Sound('jump_sound.mp3')
+
+jump.set_volume(0.1) 
+step.set_volume(0.1)
+
+
+pygame.mixer.music.load('background_music.mp3')
+pygame.mixer.music.play(-1)
+volume = 0.5
+pygame.mixer.music.set_volume(volume)
+
+
+#definition of font
+font = pygame.font.Font(None, 36)
+   
+
+
+
+pygame.mixer.pre_init(44100, -16, 2, 512)
+
+
+#game icon
+icon = pygame.image.load("profile.png")
+pygame.display.set_icon(icon)
+
+
+
+
+#SCREEN-SETTINGS
+HEIGHT = 720
+WIDTH = 1080
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption('Feed the Cat')
+
+#DEFINE COLORS
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+GREY = (128, 128, 128)
+
+
+#PLAYER
+im = pygame.image.load('cat_player_new.png').convert_alpha()
+
+char_image= pygame.transform.scale(im, (64, 64))
+
+#HEART FOR HP BAR
+heart = pygame.image.load('heart_image_new.png').convert_alpha()
+heart2 = pygame.transform.scale(heart, (50, 50))
+
+
+#WALLPAPER
+wallpaper = pygame.image.load('bg_all.png')
+def background(wallpaper):
+    size = pygame.transform.scale(wallpaper, (1080, 720))
+    screen.blit(size, (0, 0))
+
+
+
+
+
+#set frame rate
+clock = pygame.time.Clock()
+FPS = 120
+
+#PLAYER CLASS
+class Player():
+    def __init__(self, x, y):
+        self.image = pygame.transform.scale(char_image, (100, 100))
+        self.width = 45
+        self.height = 75
+        self.rect = pygame.Rect(0, 0, self.width, self.height)
+        self.rect.center = (x, y)
+        self.flip = False
+        self.is_jumping = False
+        self.jump_count = 10 #adjust here how high the player can jump
+       
+
+
+
+
+    
+        
+    #HITBOX AND PLAYER, AND FLIP
+    def draw(self):
+        screen.blit(pygame.transform.flip(self.image, self.flip, False), (self.rect.x - 25, self.rect.y - 23))
+        pygame.draw.rect(screen, WHITE, self.rect, 2)
+
+    #MOVEMENTS
+    def move(self):
+
+        #reset valuables
+        dx = 0
+        dy = 0
+        
+        #PROCESS KEY PRESSES
+        key = pygame.key.get_pressed()
+        if key [pygame.K_a] ==True:
+            dx -= 4
+            self.flip = True
+        if key [pygame.K_a] and key [pygame.K_LSHIFT] == True:
+            dx -= 8
+            #step.play()
+            self.flip = True
+        if key [pygame.K_d] == True:
+            dx += 4
+            self.flip = False
+        if key [pygame.K_d] and key [pygame.K_LSHIFT] == True:
+            dx += 8
+            #step.play()
+            self.flip = False
+        if key [pygame.K_SPACE] and not self.is_jumping:
+            self.is_jumping = True
+            jump.play()
+        if key [pygame.K_s] == True:
+            dy+= 6
+            #add something like croaching
+
+        #jumping
+        if self.is_jumping:
+            if self.jump_count >= -10:
+                neg = 1
+                if self.jump_count < 0:
+                    neg = -1
+                dy -= (self.jump_count ** 2) * 0.5 * neg
+                self.jump_count -= 1
+            else:
+                self.is_jumping = False
+                self.jump_count = 10
+
+
+        #ensure player does not go off the edges
+        if self.rect.left + dx <0:
+            dx = 0 - self.rect.left
+        if self.rect.right + dx > WIDTH:
+            dx = WIDTH - self.rect.right
+        if self.rect.top + dy < 0:
+            dy = - self.rect.top
+        if self.rect.bottom + dy +130 > HEIGHT:
+            dy = HEIGHT - self.rect.bottom - 130
+        
+
+
+
+        #update rectangle position
+        self.rect.x += dx
+        self.rect.y += dy
+
+
+#change position of health bar
+hp_y = 30
+hp_x = 30
+hp_lenght = 250
+hp_width = 25
+
+#HEALTH BAR
+class HealthBar():
+    def __init__(self, x, y, w, h, max_hp):
+        self.x = x
+        self.y = y
+        self.h = h
+        self.hp = max_hp
+        self.max_hp = max_hp
+
+
+
+    def draw(self, screen):
+        #calculatin health
+        ratio = self.hp / self.max_hp
+        pygame.draw.rect(screen, "RED", (hp_y, hp_x, hp_lenght, hp_width))
+        pygame.draw.rect(screen, "GREEN", (hp_y, hp_x, hp_lenght * ratio, hp_width))
+health_bar = HealthBar(250, 200, 300, 40, 100)
+
+
+pygame.draw.rect(screen, "BLACK", (hp_y + 5, hp_x + 5, hp_lenght + 5, hp_width + 5))
+
+
+#PROJECTILES
+class Projectile(pygame.sprite.Sprite):
+ def __init__(self, x, y, direction):
+    super().__init__()
+    self.image = pygame.Surface((20, 5))
+    self.image.fill(RED) #change color in brackets
+    self.rect = self.image.get_rect()
+    self.rect.center = (x+20, y-15) #problem with the projectiles when shooting to the left
+    self.direction = direction
+    
+
+ def update(self):
+     self.rect.x += self.direction[0] * 20 #change speed by changing the last number
+     self.rect.y += self.direction[1] * 20
+
+# Create sprite groups
+all_sprites = pygame.sprite.Group()
+projectiles = pygame.sprite.Group()
+
+
+#DEFINE CHARACTER   
+char = Player(WIDTH // 2, HEIGHT - 150)
+
+#GAME LOOP
+run = True
+
+
+
+while run:
+
+    #fps
+    clock.tick(FPS)
+   
+    char.move()
+     
+    
+    
+    #CALL BACKGROUND
+    background(wallpaper)
+    
+
+    
+    
+    
+    pygame.draw.rect(screen, "BLACK", (hp_y - 3 , hp_x - 3 , hp_lenght + 6, hp_width + 6))
+    
+    #health-bar
+    health_bar.draw(screen)
+
+    screen.blit(heart2, (10, 17))
+
+    hp = 100
+    #reducing health
+    health_bar.hp = hp
+    
+    #CALL CHARACTER
+    char.draw()
+
+    
+    pygame.display.update()
+
+    
+    
+    
+    
+    
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
+            pygame.quit()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_MINUS:
+                volume = max(0.0, volume - 0.1)  # Decrease volume
+                pygame.mixer.music.set_volume(volume)
+            elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
+                volume = min(1.0, volume + 0.1)  # Increase volume
+                pygame.mixer.music.set_volume(volume)         
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:  # ENTER BUTTON
+            # Create a projectile in the direction the player is looking
+                laser.play()
+                projectile_direction = (1, 0) if not char.flip else (-1, 0)
+                projectile = Projectile(char.rect.centerx, char.rect.centery, projectile_direction)
+                all_sprites.add(projectile)
+                projectiles.add(projectile)
+            
+        
+            
+    pygame.display.flip()
+    #clock.tick(60)
+
+    # Update projectiles
+    projectiles.update()
+
+
+    # Draw and update sprites
+    screen.blit(pygame.transform.flip(char.image, char.flip, False), (char.rect.x - 25, char.rect.y - 23))
+    pygame.draw.rect(screen, WHITE, char.rect, 2)
+
+    all_sprites.draw(screen)
+
+    pygame.display.update()
+
+    # Render and display current volume
+    volume_text = font.render(f"Music: {int(volume * 100)}%", True, (0, 0, 0))
+    screen.blit(volume_text, (900, 650))
+
+    pygame.display.flip()
+    
+
+
+        
+        
+        
+        
+    
+        
+        
